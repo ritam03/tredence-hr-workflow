@@ -32,18 +32,21 @@ A functional prototype of a mini-HR Workflow Designer module. This application a
 ## How to Run Locally
 
 1. Clone the repository:
-   \`\`\`bash
+   ```bash
    git clone https://github.com/ritam03/tredence-hr-workflow.git
-   \`\`\`
+   ```
+
 2. Navigate to the project directory:
-   \`\`\`bash
+   ```bash
    cd tredence-hr-workflow
-   \`\`\`
+   ```
+
 3. Install dependencies:
-   \`\`\`bash
+   ```bash
    npm install
-   \`\`\`
+   ```
+
 4. Start the development server:
-   \`\`\`bash
+   ```bash
    npm run dev
-   \`\`\`
+   ```
