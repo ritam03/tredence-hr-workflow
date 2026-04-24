@@ -1,14 +1,14 @@
 import { type Node, type Edge } from 'reactflow';
 
-// Mock GET /automations
+// Mock GET /automations [cite: 64]
 export const fetchAutomations = async () => {
   return new Promise((resolve) => {
     setTimeout(() => {
       resolve([
-        { id: "send_email", label: "Send Email", params: ["to", "subject"] },
-        { id: "generate_doc", label: "Generate Document", params: ["template", "recipient"] }
+        { id: "send_email", label: "Send Email", params: ["to", "subject"] }, // [cite: 68]
+        { id: "generate_doc", label: "Generate Document", params: ["template", "recipient"] } // [cite: 70]
       ]);
-    }, 500);
+    }, 500); // Simulate network delay
   });
 };
 
@@ -18,7 +18,7 @@ export const simulateWorkflow = async (nodes: Node[], edges: Edge[]) => {
     setTimeout(() => {
       const log: string[] = [];
       
-      // 1. Validation: Check for Start Node [cite: 35, 80]
+      // 1. Validation: Check for Start Node
       const startNodes = nodes.filter(n => n.type === 'start');
       if (startNodes.length === 0) {
         return resolve({ success: false, log: ["Error: No Start Node found. Workflow must begin with a Start Node."] });
@@ -27,47 +27,74 @@ export const simulateWorkflow = async (nodes: Node[], edges: Edge[]) => {
         return resolve({ success: false, log: ["Error: Multiple Start Nodes found. Only one is allowed."] });
       }
 
-      // 2. Graph Traversal Logic
-      let currentNode: Node | undefined = startNodes[0];
-      const visited = new Set<string>();
+      // 2. BFS Graph Traversal for Parallel Execution
+      const queue: Node[] = [...startNodes];
+      const visited = new Set<string>(); // Cycle detection [cite: 80]
       let executionSteps = 0;
-      const MAX_STEPS = 50; // Prevent infinite loops
+      const MAX_STEPS = 100; // Increased threshold for complex branching
       
-      log.push(`Started simulation at: ${currentNode.data.label || 'Start'}`);
+      log.push(`Started simulation at: ${startNodes[0].data.label || 'Start'}`);
+      visited.add(startNodes[0].id);
       
-      while (currentNode && executionSteps < MAX_STEPS) {
-        visited.add(currentNode.id);
+      // Process the graph layer by layer
+      while (queue.length > 0 && executionSteps < MAX_STEPS) {
+        const currentLayerSize = queue.length;
+        const parallelExecutionLogs: string[] = [];
         
-        // Find outgoing edges from the current node
-        const outgoingEdges = edges.filter(e => e.source === currentNode?.id);
-        
-        if (outgoingEdges.length === 0) {
-          if (currentNode.type !== 'end') {
-             log.push(`Warning: Workflow ended abruptly at [${currentNode.data.label || currentNode.type}]. No End Node reached.`);
-          } else {
-             log.push(`Workflow completed successfully at End Node.`);
+        // Loop through all nodes at the current execution depth
+        for (let i = 0; i < currentLayerSize; i++) {
+          const currentNode = queue.shift()!; // Dequeue
+          
+          if (currentNode.type !== 'start') {
+            parallelExecutionLogs.push(`[${currentNode.type.toUpperCase()}] ${currentNode.data.label || currentNode.type}`);
           }
-          break;
+
+          // Find all outgoing paths from this node
+          const outgoingEdges = edges.filter(e => e.source === currentNode.id);
+          
+          if (outgoingEdges.length === 0) {
+            if (currentNode.type === 'end') {
+               log.push(`Reached End Node: ${currentNode.data.label || 'End'}`);
+            } else {
+               log.push(`Warning: Dead end reached at [${currentNode.data.label || currentNode.type}]. No further connections.`);
+            }
+            continue;
+          }
+          
+          // Enqueue all connected target nodes
+          for (const edge of outgoingEdges) {
+            const nextNode = nodes.find(n => n.id === edge.target);
+            
+            if (!nextNode) {
+               log.push(`Error: Broken connection detected.`);
+               continue;
+            }
+            
+            // Cycle prevention
+            if (visited.has(nextNode.id)) {
+               log.push(`Error: Cycle detected returning to [${nextNode.data.label}]. Infinite loop prevented.`);
+               continue;
+            }
+            
+            visited.add(nextNode.id);
+            queue.push(nextNode); // Add to next layer of execution
+          }
+        }
+
+        // Format the output to clearly show parallel processing
+        if (parallelExecutionLogs.length > 0) {
+          if (parallelExecutionLogs.length > 1) {
+            log.push(`Executing Parallel Tasks:\n   -> ` + parallelExecutionLogs.join('\n   -> '));
+          } else {
+            log.push(`Executing: ${parallelExecutionLogs[0]}`);
+          }
         }
         
-        // For this prototype, we follow the first path (handles linear workflows)
-        const nextEdge = outgoingEdges[0];
-        const nextNode = nodes.find(n => n.id === nextEdge.target);
-        
-        if (!nextNode) {
-           log.push(`Error: Broken connection detected.`);
-           break;
-        }
-        
-        // Validation: Cycle detection 
-        if (visited.has(nextNode.id)) {
-           log.push(`Error: Infinite cycle detected at node [${nextNode.data.label}]. Simulation stopped.`);
-           break;
-        }
-        
-        log.push(`Executing ${nextNode.type} step: ${nextNode.data.label || nextNode.type}`);
-        currentNode = nextNode;
         executionSteps++;
+      }
+      
+      if (executionSteps >= MAX_STEPS) {
+         log.push(`Error: Max execution steps reached. Process terminated.`);
       }
       
       resolve({ success: true, log });

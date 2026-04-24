@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { temporal } from 'zundo';
 import {
   addEdge,
   applyNodeChanges,
@@ -35,49 +36,58 @@ const initialNodes: Node[] = [
   },
 ];
 
-export const useWorkflowStore = create<WorkflowState>((set, get) => ({
-  nodes: initialNodes,
-  edges: [],
-  
-  // React Flow handlers for dragging, selecting, and connecting
-  onNodesChange: (changes: NodeChange[]) => {
-    set({
-      nodes: applyNodeChanges(changes, get().nodes),
-    });
-  },
-  onEdgesChange: (changes: EdgeChange[]) => {
-    set({
-      edges: applyEdgeChanges(changes, get().edges),
-    });
-  },
-  onConnect: (connection: Connection) => {
-    set({
-      edges: addEdge(connection, get().edges),
-    });
-  },
-  
-  // Custom store actions
-  setNodes: (nodes) => set({ nodes }),
-  setEdges: (edges) => set({ edges }),
-  
-  addNode: (node: Node) => {
-    set({ nodes: [...get().nodes, node] });
-  },
-  
-  // Update specific node data fields (used by the right-hand form panel)
-  updateNodeData: (nodeId: string, data: any) => {
-    set({
-      nodes: get().nodes.map((node) =>
-        node.id === nodeId ? { ...node, data: { ...node.data, ...data } } : node
-      ),
-    });
-  },
+// Wrap the entire store creation in 'temporal' to automatically track history
+export const useWorkflowStore = create<WorkflowState>()(
+  temporal(
+    (set, get) => ({
+      nodes: initialNodes,
+      edges: [],
+      
+      // React Flow handlers for dragging, selecting, and connecting
+      onNodesChange: (changes: NodeChange[]) => {
+        set({
+          nodes: applyNodeChanges(changes, get().nodes),
+        });
+      },
+      onEdgesChange: (changes: EdgeChange[]) => {
+        set({
+          edges: applyEdgeChanges(changes, get().edges),
+        });
+      },
+      onConnect: (connection: Connection) => {
+        set({
+          edges: addEdge(connection, get().edges),
+        });
+      },
+      
+      // Custom store actions
+      setNodes: (nodes) => set({ nodes }),
+      setEdges: (edges) => set({ edges }),
+      
+      addNode: (node: Node) => {
+        set({ nodes: [...get().nodes, node] });
+      },
+      
+      updateNodeData: (nodeId: string, data: any) => {
+        set({
+          nodes: get().nodes.map((node) =>
+            node.id === nodeId ? { ...node, data: { ...node.data, ...data } } : node
+          ),
+        });
+      },
 
-  deleteNode: (nodeId: string) => {
-    set({
-      nodes: get().nodes.filter((node) => node.id !== nodeId),
-      // Also remove any edges connected to this deleted node
-      edges: get().edges.filter((edge) => edge.source !== nodeId && edge.target !== nodeId),
-    });
-  },
-}));
+      deleteNode: (nodeId: string) => {
+        set({
+          nodes: get().nodes.filter((node) => node.id !== nodeId),
+          // Clean up edges associated with the deleted node
+          edges: get().edges.filter((edge) => edge.source !== nodeId && edge.target !== nodeId),
+        });
+      },
+    }),
+    {
+      // Configuration for the temporal store (Undo/Redo)
+      partialize: (state) => ({ nodes: state.nodes, edges: state.edges }), // Only track graph changes
+      limit: 20, // Keep the last 20 actions in memory
+    }
+  )
+);
