@@ -1,18 +1,18 @@
 import { type Node, type Edge } from 'reactflow';
 
-// Mock GET /automations [cite: 64]
+// Mock GET /automations
 export const fetchAutomations = async () => {
   return new Promise((resolve) => {
     setTimeout(() => {
       resolve([
-        { id: "send_email", label: "Send Email", params: ["to", "subject"] }, // [cite: 68]
-        { id: "generate_doc", label: "Generate Document", params: ["template", "recipient"] } // [cite: 70]
+        { id: "send_email", label: "Send Email", params: ["to", "subject"] },
+        { id: "generate_doc", label: "Generate Document", params: ["template", "recipient"] }
       ]);
     }, 500); // Simulate network delay
   });
 };
 
-// Mock POST /simulate [cite: 73]
+// Mock POST /simulate
 export const simulateWorkflow = async (nodes: Node[], edges: Edge[]) => {
   return new Promise<{ success: boolean; log: string[] }>((resolve) => {
     setTimeout(() => {
@@ -29,7 +29,7 @@ export const simulateWorkflow = async (nodes: Node[], edges: Edge[]) => {
 
       // 2. BFS Graph Traversal for Parallel Execution
       const queue: Node[] = [...startNodes];
-      const visited = new Set<string>(); // Cycle detection [cite: 80]
+      const visited = new Set<string>(); // Cycle detection
       let executionSteps = 0;
       const MAX_STEPS = 100; // Increased threshold for complex branching
       
@@ -45,18 +45,20 @@ export const simulateWorkflow = async (nodes: Node[], edges: Edge[]) => {
         for (let i = 0; i < currentLayerSize; i++) {
           const currentNode = queue.shift()!; // Dequeue
           
-          if (currentNode.type !== 'start') {
-            parallelExecutionLogs.push(`[${currentNode.type.toUpperCase()}] ${currentNode.data.label || currentNode.type}`);
+          const nodeType = currentNode.type || 'default';
+          
+          if (nodeType !== 'start') {
+            parallelExecutionLogs.push(`[${nodeType.toUpperCase()}] ${currentNode.data.label || nodeType}`);
           }
 
           // Find all outgoing paths from this node
           const outgoingEdges = edges.filter(e => e.source === currentNode.id);
           
           if (outgoingEdges.length === 0) {
-            if (currentNode.type === 'end') {
+            if (nodeType === 'end') {
                log.push(`Reached End Node: ${currentNode.data.label || 'End'}`);
             } else {
-               log.push(`Warning: Dead end reached at [${currentNode.data.label || currentNode.type}]. No further connections.`);
+               log.push(`Warning: Dead end reached at [${currentNode.data.label || nodeType}]. No further connections.`);
             }
             continue;
           }
